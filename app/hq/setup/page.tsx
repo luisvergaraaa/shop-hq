@@ -2,9 +2,10 @@ import { aiEnabled } from "@/lib/ai";
 import { hasDb } from "@/lib/db";
 import { SHOP } from "@/lib/config";
 import { initDatabase } from "../actions";
+import { loadSampleData, clearSampleData } from "../demo-actions";
 
-export default async function Setup({ searchParams }: { searchParams: Promise<{ done?: string }> }) {
-  const { done } = await searchParams;
+export default async function Setup({ searchParams }: { searchParams: Promise<{ done?: string; sample?: string }> }) {
+  const { done, sample } = await searchParams;
   const checks = [
     ["Database connected (DATABASE_URL)", hasDb()],
     ["Login password set (ADMIN_PASSWORD)", (process.env.ADMIN_PASSWORD || "").length >= 8],
@@ -29,6 +30,17 @@ export default async function Setup({ searchParams }: { searchParams: Promise<{ 
         <p className="muted small">Creates your tables and adds a few starter services. Safe to run again; it never deletes anything.</p>
         <button className="btn" disabled={!hasDb()}>Set up database</button>
       </form>
+      {sample === "exists" && <div className="notice">Sample data is already loaded.</div>}
+      {sample === "services" && <div className="notice">Tap "Set up database" first so your services exist, then load sample data.</div>}
+      {sample === "cleared" && <div className="notice">Sample data removed. Your real data was not touched.</div>}
+      <div className="card stack">
+        <h2>Sample data</h2>
+        <p className="muted small">Fills the app with made-up customers, jobs, leads, drafts and expenses (fictional 555 phone numbers) so you can see it with a busy week. Remove it any time with one tap; real entries are never touched.</p>
+        <div className="row wrap">
+          <form action={loadSampleData}><button className="btn" disabled={!hasDb()}>Load sample data</button></form>
+          <form action={clearSampleData}><button className="btn ghost">Remove sample data</button></form>
+        </div>
+      </div>
       <div className="card stack" style={{ gap: 6 }}>
         <h2>Your public pages</h2>
         <p className="small">Website: <a href="/" style={{ color: "var(--teal)" }}>/</a> · Booking: <a href="/book" style={{ color: "var(--teal)" }}>/book</a></p>
