@@ -24,12 +24,14 @@ export async function aiCall(system: string, user: string, maxTokens = 600): Pro
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      console.error("[ai] anthropic error", res.status, body.slice(0, 300));
       return { text: null, error: `AI error ${res.status}: ${body.slice(0, 160)}` };
     }
     const data: any = await res.json();
     const text = (data.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
     return { text: text || null, error: text ? undefined : "empty" };
   } catch (e: any) {
+    console.error("[ai] call failed", String(e?.message || e).slice(0, 300));
     return { text: null, error: String(e?.message || e).slice(0, 160) };
   }
 }
