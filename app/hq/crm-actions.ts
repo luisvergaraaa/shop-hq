@@ -167,7 +167,7 @@ export async function askAssistant(f: FormData) {
   if (!aiEnabled()) redirect("/hq/assistant?e=noai");
   const data = await snapshot();
   const ai = await aiCall(ASSISTANT_VOICE, `BUSINESS DATA\n${data}\n\nQUESTION\n${q}`, 700);
-  if (!ai.text) redirect("/hq/assistant?e=fail");
+  if (!ai.text) redirect(`/hq/assistant?e=fail&why=${encodeURIComponent((ai.error || "").slice(0, 220))}`);
   await sql`insert into ai_log (kind, question, answer) values ('chat', ${q}, ${ai.text})`;
   revalidatePath("/hq/assistant");
   redirect("/hq/assistant");
