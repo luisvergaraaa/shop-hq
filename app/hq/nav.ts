@@ -22,6 +22,7 @@ export const NAV: { section: string; icon: string; items: NavItem[] }[] = [
     { href: "/hq/jobs", label: "Jobs" },
     { href: "/hq/customers", label: "Customers" },
     { href: "/hq/invoices", label: "Invoices", badge: "unpaid" },
+    { href: "/hq/vehicle", label: "Vehicle info" },
   ]},
   { section: "Numbers", icon: "chart", items: [
     { href: "/hq/funnel", label: "Funnel" },
