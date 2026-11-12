@@ -17,15 +17,15 @@ const TECH_VOICE = `You are Torque, the built-in diagnostic reference for a one-
 
 Reply in EXACTLY this layout, plain text, no markdown symbols:
 SUMMARY: one or two sentences on what is probably going on.
+FLOW: the signal or circuit path for the suspect system as 4-7 short generic nodes joined by " > ", e.g. Battery > Fuse > Fuel pump relay > Pump > Rail pressure sensor > PCM
 LIKELY CAUSES:
 1. cause (most likely first, mention known issues for this platform only if you are confident)
 2. ...
 TEST PLAN:
 1. step: what to check, with the tool to use and what a good vs bad result looks like (typical values only)
 2. ...
-FLOW: the signal or circuit path for the suspect system as 4-7 short generic nodes joined by " > ", e.g. Battery > Fuse > Fuel pump relay > Pump > Rail pressure sensor > PCM
 WATCH OUT: one or two cautions (safety, easy-to-miss things, what not to replace yet).
-Keep it under 330 words total.`;
+Keep it under 300 words total, steps concise.`;
 
 const SECTION_RE = /^(SUMMARY|LIKELY CAUSES|TEST PLAN|FLOW|WATCH OUT):\s*/;
 function parse(text: string) {
@@ -101,7 +101,7 @@ export default async function VehicleInfo({ searchParams }: { searchParams: Prom
     if (!aiEnabled()) aiNote = "AI isn't connected yet. Add ANTHROPIC_API_KEY in Vercel, then redeploy.";
     else {
       const veh = have ? `${year} ${make} ${model}${decoded?.EngineModel ? ", engine " + decoded.EngineModel : ""}${decoded?.DisplacementL ? " " + decoded.DisplacementL + "L" : ""}` : "vehicle not specified";
-      const ai = await aiCall(TECH_VOICE, `VEHICLE: ${veh}\n\nQUESTION: ${q}`, 1200);
+      const ai = await aiCall(TECH_VOICE, `VEHICLE: ${veh}\n\nQUESTION: ${q}`, 2200);
       if (ai.text) answer = ai.text; else aiNote = "The AI didn't answer. " + (ai.error ? "Reason: " + ai.error.slice(0, 160) : "Try again in a moment.");
     }
   }
