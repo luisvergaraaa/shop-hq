@@ -123,6 +123,19 @@ create table if not exists ai_log (
   answer text not null default '',
   created_at timestamptz not null default now()
 );
+create table if not exists repair_notes (
+  id serial primary key,
+  vehicle text not null default '',
+  year text not null default '',
+  make text not null default '',
+  model text not null default '',
+  code text not null default '',
+  symptom text not null default '',
+  fix text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists repair_notes_mm_idx on repair_notes(make, model);
 create index if not exists leads_stage_idx on leads(stage);
 create index if not exists messages_lead_idx on messages(lead_id);
 create index if not exists approvals_status_idx on approvals(status);

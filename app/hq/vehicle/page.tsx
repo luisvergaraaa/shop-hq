@@ -1,8 +1,10 @@
 import { aiEnabled, aiCall } from "@/lib/ai";
+import { ensureSchema, sql } from "@/lib/db";
+import { saveRepairNote, deleteRepairNote } from "./actions";
 
 export const maxDuration = 60;
 
-type Sp = { vin?: string; year?: string; make?: string; model?: string; q?: string };
+type Sp = { vin?: string; year?: string; make?: string; model?: string; q?: string; saved?: string; lib?: string };
 const GET = async (url: string) => {
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(9000), cache: "no-store" });
@@ -11,7 +13,58 @@ const GET = async (url: string) => {
 };
 const enc = encodeURIComponent;
 
-const TECH_VOICE = `You are Torque, a diagnostic helper for a one-person mobile vehicle diagnostic business. You are NOT a source of factory data. Give a practical test plan: most likely causes first, what to measure (generic expected ranges only when they are well known), and in what order. Never state wire colors, connector pin numbers, torque specs, fuse locations or exact diagnostic values for a specific vehicle as facts; instead say "confirm in ProDemand". If unsure, say so. Never claim to show a wiring diagram. Plain text, short lines or dashes, no markdown headings, under 250 words.`;
+const TECH_VOICE = `You are Torque, the built-in diagnostic reference for a one-person mobile vehicle diagnostic business. You do NOT have factory wiring diagrams or OEM data, so never state wire colors, connector pin numbers, torque specs, fuse positions or exact vehicle-specific values as facts; for those say "verify with factory info". Generic, widely known values (battery 12.4-12.7V off, charging 13.8-14.7V, fuel trim +/-10%, etc.) are fine and should be labeled typical.
+
+Reply in EXACTLY this layout, plain text, no markdown symbols:
+SUMMARY: one or two sentences on what is probably going on.
+LIKELY CAUSES:
+1. cause (most likely first, mention known issues for this platform only if you are confident)
+2. ...
+TEST PLAN:
+1. step: what to check, with the tool to use and what a good vs bad result looks like (typical values only)
+2. ...
+FLOW: the signal or circuit path for the suspect system as 4-7 short generic nodes joined by " > ", e.g. Battery > Fuse > Fuel pump relay > Pump > Rail pressure sensor > PCM
+WATCH OUT: one or two cautions (safety, easy-to-miss things, what not to replace yet).
+Keep it under 330 words total.`;
+
+const SECTION_RE = /^(SUMMARY|LIKELY CAUSES|TEST PLAN|FLOW|WATCH OUT):\s*/;
+function parse(text: string) {
+  const out: Record<string, string> = {};
+  let cur = "";
+  for (const line of text.split("\n")) {
+    const m = line.match(SECTION_RE);
+    if (m) { cur = m[1]; out[cur] = line.replace(SECTION_RE, ""); }
+    else if (cur) out[cur] += "\n" + line;
+  }
+  for (const k of Object.keys(out)) out[k] = out[k].trim();
+  return out;
+}
+
+function FlowDiagram({ flow }: { flow: string }) {
+  const nodes = flow.split(">").map((n) => n.trim()).filter(Boolean).slice(0, 8);
+  if (nodes.length < 2) return null;
+  const w = 118, gap = 26, h = 46;
+  const width = nodes.length * w + (nodes.length - 1) * gap + 4;
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg width={width} height={h + 4} role="img" aria-label="Generic signal path">
+        {nodes.map((n, i) => {
+          const x = 2 + i * (w + gap);
+          const words = n.split(" ");
+          const l1 = words.slice(0, Math.ceil(words.length / 2)).join(" "), l2 = words.slice(Math.ceil(words.length / 2)).join(" ");
+          return (
+            <g key={i}>
+              <rect x={x} y={2} width={w} height={h} rx={8} fill="none" stroke="currentColor" strokeOpacity={0.45} />
+              <text x={x + w / 2} y={l2 ? 20 : 30} textAnchor="middle" fontSize={12} fill="currentColor">{l1.slice(0, 18)}</text>
+              {l2 && <text x={x + w / 2} y={36} textAnchor="middle" fontSize={12} fill="currentColor">{l2.slice(0, 18)}</text>}
+              {i < nodes.length - 1 && <path d={`M${x + w + 3} ${2 + h / 2} H${x + w + gap - 3} m-5 -4 l5 4 l-5 4`} fill="none" stroke="currentColor" strokeOpacity={0.7} />}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
 
 export default async function VehicleInfo({ searchParams }: { searchParams: Promise<Sp> }) {
   const sp = await searchParams;
@@ -48,15 +101,22 @@ export default async function VehicleInfo({ searchParams }: { searchParams: Prom
     if (!aiEnabled()) aiNote = "AI isn't connected yet. Add ANTHROPIC_API_KEY in Vercel, then redeploy.";
     else {
       const veh = have ? `${year} ${make} ${model}${decoded?.EngineModel ? ", engine " + decoded.EngineModel : ""}${decoded?.DisplacementL ? " " + decoded.DisplacementL + "L" : ""}` : "vehicle not specified";
-      const ai = await aiCall(TECH_VOICE, `VEHICLE: ${veh}\n\nQUESTION: ${q}`, 700);
-      if (ai.text) answer = ai.text; else aiNote = "The AI didn't answer. Try again in a moment.";
+      const ai = await aiCall(TECH_VOICE, `VEHICLE: ${veh}\n\nQUESTION: ${q}`, 1200);
+      if (ai.text) answer = ai.text; else aiNote = "The AI didn't answer. " + (ai.error ? "Reason: " + ai.error.slice(0, 160) : "Try again in a moment.");
     }
   }
+  let notes: any[] = [];
+  try {
+    await ensureSchema();
+    if (have) notes = await sql`select id, year, code, symptom, fix, notes, to_char(created_at at time zone 'America/Chicago','Mon DD YYYY') as at from repair_notes where lower(make) = lower(${make}) and lower(model) = lower(${model}) order by id desc limit 30`;
+    else if (sp.lib) notes = await sql`select id, vehicle, year, code, symptom, fix, notes, to_char(created_at at time zone 'America/Chicago','Mon DD YYYY') as at from repair_notes order by id desc limit 30`;
+  } catch {}
+  const parsed = answer ? parse(answer) : null;
   const label = have ? `${year} ${make} ${model}` : "";
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <div className="page-head" style={{ marginBottom: 0 }}><div><h1>Vehicle info</h1><p className="muted">Decode a VIN, check recalls, and get a test plan. For wiring diagrams, open ProDemand.</p></div></div>
+      <div className="page-head" style={{ marginBottom: 0 }}><div><h1>Vehicle info</h1><p className="muted">Decode a VIN, check recalls, get a diagnostic plan with a signal-path diagram, and keep your own repair notes.</p></div></div>
 
       <form className="card stack" method="get">
         <h2>Find a vehicle</h2>
@@ -69,9 +129,9 @@ export default async function VehicleInfo({ searchParams }: { searchParams: Prom
         <textarea name="q" placeholder="Optional: what's wrong? e.g. P0301 misfire on cylinder 1, rough idle cold" defaultValue={q} style={{ minHeight: 70 }} />
         <div className="row wrap">
           <button className="btn">Look up</button>
-          <a className="btn ghost" href="https://mitchell1.com/prodemand/" target="_blank" rel="noopener noreferrer">Open ProDemand ↗</a>
+          <a className="btn ghost" href="/hq/vehicle?lib=1">My repair library</a>
         </div>
-        {label && <p className="small">Looking at <b>{label}</b>. ProDemand can't be pre-filled from here, so enter this in its vehicle selector.</p>}
+        {label && <p className="small">Looking at <b>{label}</b>.</p>}
         {note && <p className="small" style={{ color: "var(--accent-text)" }}>{note}</p>}
       </form>
 
@@ -86,10 +146,50 @@ export default async function VehicleInfo({ searchParams }: { searchParams: Prom
 
       {q && (
         <div className="card stack">
-          <h2>Torque's test plan</h2>
+          <h2>Torque's diagnostic plan{label ? ` for ${label}` : ""}</h2>
           {aiNote && <p className="small">{aiNote}</p>}
-          {answer && <div className="ai-answer" style={{ whiteSpace: "pre-wrap" }}>{answer}</div>}
-          <p className="tiny">AI guidance, not factory data. Confirm wire colors, pins, specs and procedures in ProDemand before you cut, probe or replace anything.</p>
+          {parsed && Object.keys(parsed).length > 0 ? (
+            <>
+              {parsed["SUMMARY"] && <p>{parsed["SUMMARY"]}</p>}
+              {parsed["LIKELY CAUSES"] && <div><h3 style={{ fontSize: 15 }}>Likely causes</h3><div className="ai-answer" style={{ whiteSpace: "pre-wrap" }}>{parsed["LIKELY CAUSES"]}</div></div>}
+              {parsed["TEST PLAN"] && <div><h3 style={{ fontSize: 15 }}>Test plan</h3><div className="ai-answer" style={{ whiteSpace: "pre-wrap" }}>{parsed["TEST PLAN"]}</div></div>}
+              {parsed["FLOW"] && <div><h3 style={{ fontSize: 15 }}>Signal path (generic, not vehicle-specific)</h3><FlowDiagram flow={parsed["FLOW"]} /></div>}
+              {parsed["WATCH OUT"] && <div><h3 style={{ fontSize: 15 }}>Watch out</h3><div className="ai-answer" style={{ whiteSpace: "pre-wrap" }}>{parsed["WATCH OUT"]}</div></div>}
+            </>
+          ) : answer ? <div className="ai-answer" style={{ whiteSpace: "pre-wrap" }}>{answer}</div> : null}
+          <p className="tiny">AI guidance, not factory data. Wire colors, pinouts, specs and torque values are not included on purpose; verify those with factory info before you cut, probe or replace anything.</p>
+        </div>
+      )}
+
+      {(have || sp.lib) && (
+        <div className="card stack">
+          <h2>{have ? `Your repair notes for ${make} ${model}` : "My repair library"} ({notes.length})</h2>
+          {sp.saved === "1" && <p className="small" style={{ color: "var(--teal)" }}>Saved.</p>}
+          {sp.saved === "0" && <p className="small" style={{ color: "var(--accent-text)" }}>Add at least a fix, symptom or note.</p>}
+          {notes.length === 0 && <p className="muted small">{have ? "Nothing saved for this model yet. Save what you find on each job below and it will show up here next time." : "No notes yet. Look up a vehicle and save your first one."}</p>}
+          {notes.map((n) => (
+            <div key={n.id} style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+              <div className="row" style={{ gap: 8, justifyContent: "space-between" }}>
+                <b className="small">{[n.vehicle || n.year, n.code].filter(Boolean).join(" · ")}</b>
+                <span className="tiny">{n.at}</span>
+              </div>
+              {n.symptom && <p className="small">Symptom: {n.symptom}</p>}
+              {n.fix && <p className="small">Fix: {n.fix}</p>}
+              {n.notes && <p className="tiny" style={{ whiteSpace: "pre-wrap" }}>{n.notes}</p>}
+              <form action={deleteRepairNote}><input type="hidden" name="id" value={n.id} /><input type="hidden" name="back" value={have ? `/hq/vehicle?year=${enc(year)}&make=${enc(make)}&model=${enc(model)}` : "/hq/vehicle?lib=1"} /><button className="btn ghost" style={{ marginTop: 4, fontSize: 12 }}>Delete</button></form>
+            </div>
+          ))}
+          {have && (
+            <form action={saveRepairNote} className="stack" style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+              <h3 style={{ fontSize: 15 }}>Save a repair note</h3>
+              <input type="hidden" name="year" value={year} /><input type="hidden" name="make" value={make} /><input type="hidden" name="model" value={model} />
+              <input name="code" placeholder="Code(s), e.g. P0301" />
+              <input name="symptom" placeholder="Symptom" />
+              <textarea name="fix" placeholder="What fixed it (part, repair, test values you measured)" style={{ minHeight: 60 }} />
+              <textarea name="notes" placeholder="Tips for next time: location of parts, tricks, wiring colors you verified" style={{ minHeight: 50 }} />
+              <div><button className="btn">Save note</button></div>
+            </form>
+          )}
         </div>
       )}
 
