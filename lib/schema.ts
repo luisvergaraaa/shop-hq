@@ -76,4 +76,54 @@ create table if not exists tasks (
 );
 create index if not exists jobs_status_idx on jobs(status);
 create index if not exists jobs_sched_idx on jobs(scheduled_at);
+create table if not exists leads (
+  id serial primary key,
+  name text not null,
+  phone text not null default '',
+  email text not null default '',
+  source text not null default 'Other',
+  vehicle text not null default '',
+  notes text not null default '',
+  stage text not null default 'new',
+  follow_up_on date,
+  customer_id integer references customers(id) on delete set null,
+  job_id integer references jobs(id) on delete set null,
+  last_contact_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create table if not exists messages (
+  id serial primary key,
+  lead_id integer not null references leads(id) on delete cascade,
+  direction text not null default 'in',
+  body text not null default '',
+  created_at timestamptz not null default now()
+);
+create table if not exists approvals (
+  id serial primary key,
+  kind text not null default 'reply',
+  lead_id integer references leads(id) on delete cascade,
+  job_id integer references jobs(id) on delete cascade,
+  to_name text not null default '',
+  to_phone text not null default '',
+  body text not null default '',
+  reason text not null default '',
+  by_ai boolean not null default false,
+  status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+create table if not exists automations (
+  key text primary key,
+  enabled boolean not null default true
+);
+create table if not exists ai_log (
+  id serial primary key,
+  kind text not null default 'chat',
+  question text not null default '',
+  answer text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists leads_stage_idx on leads(stage);
+create index if not exists messages_lead_idx on messages(lead_id);
+create index if not exists approvals_status_idx on approvals(status);
 `;

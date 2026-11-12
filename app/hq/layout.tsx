@@ -5,12 +5,14 @@ import { SHOP } from "@/lib/config";
 import { requireAdmin } from "@/lib/session";
 import { NavList, TabBar } from "./NavList";
 import { getCounts } from "./data";
+import { ensureSchema } from "@/lib/db";
 import { logout } from "../login/actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function HQLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
+  try { await ensureSchema(); } catch {}
   const { counts, dbReady } = await getCounts();
   const initials = (process.env.ADMIN_EMAIL || "Me").slice(0, 2).toUpperCase();
   const brand = (
@@ -36,7 +38,7 @@ export default async function HQLayout({ children }: { children: React.ReactNode
         <header className="topbar">
           <div className="brand mobile-only">{brand}</div>
           <div className="row" style={{ marginLeft: "auto" }}>
-            {counts.requested > 0 && <Link href="/hq/requests" className="pill">{counts.requested} waiting</Link>}
+            {counts.requested + counts.approvals > 0 && <Link href={counts.requested > 0 ? "/hq/requests" : "/hq/approvals"} className="pill">{counts.requested + counts.approvals} waiting</Link>}
             <ThemeToggle />
           </div>
         </header>

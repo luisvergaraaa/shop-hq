@@ -17,7 +17,7 @@ export async function submitBooking(form: FormData) {
     serviceId: Number(form.get("service")) || null,
     when: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when) ? when : null,
     address: s(form, "address", 300), concern: s(form, "concern", 2000),
-    status: "requested",
+    status: "requested", source: "Website",
   });
   redirect("/book/thanks");
 }

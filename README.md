@@ -20,6 +20,17 @@ Everything a one-person mobile diagnostic shop needs, in one Next.js app on Verc
 - Services & pricing – edit what shows on your website
 - Setup – checks your settings and creates the database
 
+**AI CRM (also in `/hq`)**
+- Leads – every inquiry with a stage (New → Contacted → Quoted → Booked → Won/Lost); website bookings and new jobs create leads automatically
+- Inbox – paste a text you received; it's filed under the person and a reply is drafted
+- Torque (assistant) – ask questions about your leads, jobs and money
+- Approvals – every AI draft waits here; open it in Messages, send, tap "I sent it". Nothing is sent automatically
+- Automations – drafts for new leads, due follow-ups, unanswered quotes, review requests
+- Find leads – pulls local businesses (landscapers, contractors, dealers, delivery, property managers…) across the 309 from Google's business listings into your leads with their phone numbers, ready to dial. Needs `GOOGLE_PLACES_KEY`
+- Funnel – leads by stage and by source; Insights – weekly AI summary; Import – paste a spreadsheet of leads
+
+AI needs `ANTHROPIC_API_KEY` (Vercel → Settings → Environment Variables). Without it, drafts use simple templates. Optional: `AI_MODEL`, `REVIEW_LINK` (your Google review link), `CRON_SECRET` (enables the daily auto-check).
+
 ## Put it online (about 15 minutes)
 
 1. **GitHub**: create a new repository (e.g. `shop-hq`) and upload all the files in this folder.

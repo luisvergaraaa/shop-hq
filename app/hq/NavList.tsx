@@ -32,9 +32,9 @@ export function NavList({ counts }: { counts: Counts }) {
 
 const TABS = [
   { href: "/hq", label: "Overview", icon: "home", badge: "today" },
-  { href: "/hq/requests", label: "Requests", icon: "inbox", badge: "requested" },
-  { href: "/hq/jobs", label: "Jobs", icon: "wrench" },
-  { href: "/hq/customers", label: "Customers", icon: "users" },
+  { href: "/hq/leads", label: "Leads", icon: "users", badge: "leads" },
+  { href: "/hq/inbox", label: "Inbox", icon: "inbox", badge: "inbox" },
+  { href: "/hq/assistant", label: "Torque", icon: "spark", badge: "approvals" },
   { href: "/hq/more", label: "More", icon: "more" },
 ] as const;
 

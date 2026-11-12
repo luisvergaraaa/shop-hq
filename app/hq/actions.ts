@@ -12,6 +12,10 @@ const str = (f: FormData, k: string, max = 2000) => String(f.get(k) || "").trim(
 const id = (f: FormData, k = "id") => Number(f.get(k)) || 0;
 const validWhen = (s: string) => (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? s : null);
 
+async function syncLead(jobId: number, stage: "won" | "lost") {
+  await sql`update leads set stage = ${stage} where job_id = ${jobId} and stage <> ${stage}`;
+}
+
 function refresh(jobId?: number) {
   revalidatePath("/hq", "layout");
   if (jobId) revalidatePath(`/hq/jobs/${jobId}`);
@@ -29,6 +33,7 @@ export async function declineRequest(f: FormData) {
   await requireAdmin();
   const j = id(f);
   await sql`update jobs set status = 'declined' where id = ${j}`;
+  await syncLead(j, "lost");
   refresh(j);
 }
 
@@ -39,6 +44,8 @@ export async function setStatus(f: FormData) {
   if (!STATUSES.some((s) => s.key === status)) return;
   if (status === "complete") await sql`update jobs set status = ${status}, completed_at = coalesce(completed_at, now()) where id = ${j}`;
   else await sql`update jobs set status = ${status} where id = ${j}`;
+  if (status === "complete") await syncLead(j, "won");
+  if (status === "declined") await syncLead(j, "lost");
   refresh(j);
 }
 
@@ -98,6 +105,7 @@ export async function markPaid(f: FormData) {
       status = case when status in ('declined','requested') then status else 'complete' end,
       completed_at = coalesce(completed_at, now())
     where id = ${j}`;
+  await syncLead(j, "won");
   refresh(j);
 }
 
@@ -117,7 +125,7 @@ export async function newJob(f: FormData) {
     year: str(f, "year", 4), make: str(f, "make", 40), model: str(f, "model", 60),
     vin: str(f, "vin", 17), mileage: str(f, "mileage", 12),
     serviceId: Number(f.get("service")) || null, when: validWhen(str(f, "when")),
-    address: str(f, "address", 300), concern: str(f, "concern"), status: "scheduled",
+    address: str(f, "address", 300), concern: str(f, "concern"), status: "scheduled", source: str(f, "source", 30) || "Phone",
   });
   refresh();
   redirect(`/hq/jobs/${jobId}`);

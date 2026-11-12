@@ -9,6 +9,7 @@ export type NewJob = {
   year?: string; make?: string; model?: string; vin?: string; mileage?: string;
   serviceId?: number | null; when?: string | null; address?: string; concern?: string;
   status: "requested" | "scheduled";
+  source?: string; // when set, the job also appears in the Leads pipeline
 };
 
 /** Finds or creates the customer, adds the vehicle, creates the job and its starting line item. */
@@ -35,6 +36,12 @@ export async function createJob(j: NewJob) {
     values (${customerId}, ${vehicleId}, ${j.serviceId || null}, ${j.status}, ${j.when || null}, ${j.address || ""}, ${j.concern || ""}, ${token()})
     returning id`;
   const jobId = job[0].id;
+
+  if (j.source) {
+    const veh = [j.year, j.make, j.model].filter(Boolean).join(" ");
+    await sql`insert into leads (name, phone, email, source, vehicle, notes, stage, customer_id, job_id)
+      values (${j.name.trim()}, ${phone}, ${j.email || ""}, ${j.source}, ${veh}, ${j.concern || ""}, 'booked', ${customerId}, ${jobId})`;
+  }
 
   if (j.serviceId) {
     const s = await sql`select name, price_cents from services where id = ${j.serviceId}`;

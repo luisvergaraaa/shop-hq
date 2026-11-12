@@ -9,10 +9,13 @@ export async function getCounts(): Promise<{ counts: Counts; dbReady: boolean }>
       (select count(*) from jobs where scheduled_at::date = ${t}::date and status not in ('declined','requested'))::int as today,
       (select count(*) from jobs where status = 'requested')::int as requested,
       (select count(*) from tasks where not done)::int as tasks,
-      (select count(*) from jobs where status = 'complete' and paid_at is null)::int as unpaid`;
+      (select count(*) from jobs where status = 'complete' and paid_at is null)::int as unpaid,
+      (select count(*) from leads where stage in ('new','contacted','quoted'))::int as leads,
+      (select count(*) from leads l where (select direction from messages m where m.lead_id = l.id order by m.id desc limit 1) = 'in')::int as inbox,
+      (select count(*) from approvals where status = 'pending')::int as approvals`;
     return { counts: r[0], dbReady: true };
   } catch {
-    return { counts: { today: 0, requested: 0, tasks: 0, unpaid: 0 }, dbReady: false };
+    return { counts: { today: 0, requested: 0, tasks: 0, unpaid: 0, leads: 0, inbox: 0, approvals: 0 }, dbReady: false };
   }
 }
 

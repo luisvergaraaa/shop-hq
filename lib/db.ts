@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { SCHEMA } from "./schema";
 
 let client: any = null;
 function get() {
@@ -19,4 +20,19 @@ export function rawQuery(text: string, params: any[] = []): Promise<any[]> {
 
 export function hasDb() {
   return Boolean(process.env.DATABASE_URL);
+}
+
+let schemaReady: Promise<void> | null = null;
+/** Creates any missing tables once per server start. Safe to call often. */
+export function ensureSchema(): Promise<void> {
+  if (!hasDb()) return Promise.resolve();
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      for (const stmt of SCHEMA.split(";").map((s) => s.trim()).filter(Boolean)) await rawQuery(stmt);
+    })().catch((e) => {
+      schemaReady = null;
+      throw e;
+    });
+  }
+  return schemaReady;
 }

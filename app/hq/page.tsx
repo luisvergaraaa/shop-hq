@@ -14,12 +14,15 @@ async function load() {
         (select count(*) from jobs where status = 'requested')::int as requested,
         (select coalesce(sum(li.qty*li.unit_cents),0)::int from line_items li join jobs j on j.id = li.job_id where j.status = 'complete' and j.paid_at is null) as unpaid,
         (select coalesce(sum(paid_cents),0)::int from jobs where paid_at >= ${ws}::date) as week_rev,
-        (select coalesce(sum(amount_cents),0)::int from expenses where spent_on >= ${ws}::date) as week_exp`,
+        (select coalesce(sum(amount_cents),0)::int from expenses where spent_on >= ${ws}::date) as week_exp,
+        (select count(*) from approvals where status = 'pending')::int as approvals,
+        (select count(*) from leads where stage in ('new','contacted','quoted'))::int as leads,
+        (select count(*) from leads l where (select direction from messages m where m.lead_id = l.id order by m.id desc limit 1) = 'in')::int as inbox`,
       sql`select id, title, to_char(due_on,'YYYY-MM-DD') as due from tasks where not done order by due_on nulls last, id limit 5`,
     ]);
     return { today, jobs, n: nums[0], tasks };
   } catch {
-    return { today, jobs: [], n: { requested: 0, unpaid: 0, week_rev: 0, week_exp: 0 }, tasks: [] };
+    return { today, jobs: [], n: { requested: 0, unpaid: 0, week_rev: 0, week_exp: 0, approvals: 0, leads: 0, inbox: 0 }, tasks: [] };
   }
 }
 
@@ -41,6 +44,11 @@ export default async function Overview() {
         <Link href="/hq/invoices" className="stat"><div className="label">Unpaid</div><div className="value">{money(n.unpaid)}</div></Link>
         <Link href="/hq/report" className="stat"><div className="label">Profit this week</div><div className="value">{money(n.week_rev - n.week_exp)}</div></Link>
       </div>
+
+      <Link href="/hq/approvals" className="card row between" style={{ borderColor: "var(--accent)" }}>
+        <div><h3>Needs your attention</h3><p className="muted small">{n.approvals} draft{n.approvals === 1 ? "" : "s"} to approve · {n.leads} open lead{n.leads === 1 ? "" : "s"} · {n.inbox} message{n.inbox === 1 ? "" : "s"} to answer</p></div>
+        <span className="muted">→</span>
+      </Link>
 
       <div className="card">
         <div className="row between"><h2>Today's route</h2><Link href="/hq/calendar" className="muted small">Calendar →</Link></div>

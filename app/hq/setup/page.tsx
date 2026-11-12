@@ -1,3 +1,4 @@
+import { aiEnabled } from "@/lib/ai";
 import { hasDb } from "@/lib/db";
 import { SHOP } from "@/lib/config";
 import { initDatabase } from "../actions";
@@ -9,6 +10,10 @@ export default async function Setup({ searchParams }: { searchParams: Promise<{ 
     ["Login password set (ADMIN_PASSWORD)", (process.env.ADMIN_PASSWORD || "").length >= 8],
     ["Shop name set (SHOP_NAME)", Boolean(process.env.SHOP_NAME)],
     ["Shop phone set (SHOP_PHONE)", Boolean(process.env.SHOP_PHONE)],
+    ["AI connected (ANTHROPIC_API_KEY)", aiEnabled()],
+    ["Lead finder on (GOOGLE_PLACES_KEY)", Boolean(process.env.GOOGLE_PLACES_KEY)],
+    ["Google review link set (REVIEW_LINK)", Boolean(process.env.REVIEW_LINK)],
+    ["Daily auto-check on (CRON_SECRET)", Boolean(process.env.CRON_SECRET)],
   ] as const;
   return (
     <div className="stack" style={{ gap: 16 }}>
