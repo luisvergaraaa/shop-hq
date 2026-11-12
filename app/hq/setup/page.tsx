@@ -1,3 +1,4 @@
+export const maxDuration = 60;
 import { aiEnabled } from "@/lib/ai";
 import { hasDb } from "@/lib/db";
 import { SHOP } from "@/lib/config";
@@ -35,7 +36,7 @@ export default async function Setup({ searchParams }: { searchParams: Promise<{ 
       {sample === "cleared" && <div className="notice">Sample data removed. Your real data was not touched.</div>}
       <div className="card stack">
         <h2>Sample data</h2>
-        <p className="muted small">Fills the app with made-up customers, jobs, leads, drafts and expenses (fictional 555 phone numbers) so you can see it with a busy week. Remove it any time with one tap; real entries are never touched.</p>
+        <p className="muted small">Fills the app as if you were a busy, scaled shop: about 180 jobs over 12 weeks, 50 leads (including real central-IL businesses to cold-call), drafts and expenses. Loading again replaces older sample data. Remove it any time; your real entries are never touched.</p>
         <div className="row wrap">
           <form action={loadSampleData}><button className="btn" disabled={!hasDb()}>Load sample data</button></form>
           <form action={clearSampleData}><button className="btn ghost">Remove sample data</button></form>
